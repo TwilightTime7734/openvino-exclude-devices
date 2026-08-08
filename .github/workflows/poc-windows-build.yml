@@ -1,0 +1,56 @@
+name: POC Windows OpenVINO build
+
+on:
+  push:
+    branches:
+      - feature/exclude-devices
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2025
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        shell: pwsh
+        run: >-
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_BUILD_TYPE=Release
+          -DENABLE_TESTS=OFF
+          -DENABLE_SAMPLES=OFF
+          -DENABLE_PYTHON=OFF
+
+      - name: Build Release
+        shell: pwsh
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Collect runtime files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifact | Out-Null
+          $paths = @(
+            "build/bin/intel64/Release",
+            "bin/intel64/Release"
+          )
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              Copy-Item -Recurse -Force "$p/*" artifact/
+            }
+          }
+          Get-ChildItem artifact -Recurse | Select-Object FullName
+
+      - name: Upload Windows runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: openvino-poc-windows-gpu0-excluded
+          path: artifact
+          if-no-files-found: error

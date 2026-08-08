@@ -23,7 +23,7 @@ std::filesystem::path find_plugins_xml(const std::filesystem::path& xml_file) {
         return xml_file;
     }
 
-    // Default plugin xml file name, will search in OV folder.
+    // Default plugin xml file name, will search in OV folder
     const auto& xml_file_name = xml_file.empty() ? std::filesystem::path("plugins.xml") : xml_file;
     const auto ov_library_path = ov::util::get_ov_lib_path();
 
@@ -60,6 +60,21 @@ std::filesystem::path find_plugins_xml(const std::filesystem::path& xml_file) {
 class Core::Impl : public CoreImpl {
 public:
     Impl() : ov::CoreImpl() {}
+
+    // Proof-of-concept for multi-GPU systems where GPU.0 is the display iGPU.
+    // Keep the physical device enabled for the OS, but exclude it from the
+    // OpenVINO device list used by automatic/distributed device selection.
+    std::vector<std::string> get_available_devices() const override {
+        const auto devices = ov::CoreImpl::get_available_devices();
+        std::vector<std::string> filtered_devices;
+        filtered_devices.reserve(devices.size());
+        for (const auto& device : devices) {
+            if (device == "GPU.0")
+                continue;
+            filtered_devices.push_back(device);
+        }
+        return filtered_devices;
+    }
 };
 
 Core::Core(const std::string& xml_config_file) : Core(ov::util::make_path(xml_config_file)) {}
